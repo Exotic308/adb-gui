@@ -157,4 +157,3 @@ class LogsService extends ChangeNotifier {
     super.dispose();
   }
 }
-

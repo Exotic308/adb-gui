@@ -8,6 +8,7 @@ class LogEntry {
   final Priority priority;
   final String tag;
   final String message;
+
   int get pid => processId;
   int get tid => threadId;
 

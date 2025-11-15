@@ -6,17 +6,19 @@ import '../models/log_entry.dart';
 import '../utils/log_parser.dart';
 import 'adb_service.dart';
 import 'rules_service.dart';
+import 'package_service.dart';
 
 class LogcatService {
   final AdbService _adbService;
   final RulesService _rulesService;
+  final PackageService _packageService;
   Process? _logcatProcess;
   StreamController<LogEntry>? _logStreamController;
   LogEntry? _lastEntry;
   
   bool get isRunning => _logcatProcess != null;
 
-  LogcatService(this._adbService, this._rulesService);
+  LogcatService(this._adbService, this._rulesService, this._packageService);
 
   /// Start streaming logcat from a device
   Future<Stream<LogEntry>> startLogcat(String deviceId, {int? processId}) async {
@@ -25,6 +27,9 @@ class LogcatService {
     }
 
     _logStreamController = StreamController<LogEntry>.broadcast();
+    
+    // Start periodic package name refresh
+    _packageService.startRefresh(deviceId);
     
     // Build ADB command arguments
     final args = <String>['-s', deviceId, 'logcat', '-v', 'threadtime'];
@@ -73,7 +78,11 @@ class LogcatService {
     // Don't process if stream is closed
     if (_logStreamController == null || _logStreamController!.isClosed) return;
 
-    final entry = LogParser.parseLine(line, currentYear: DateTime.now().year, lastEntry: _lastEntry);
+    final entry = LogParser.parseLine(
+      line,
+      currentYear: DateTime.now().year,
+      lastEntry: _lastEntry,
+    );
     
     if (entry != null) {
       _lastEntry = entry;
@@ -90,6 +99,9 @@ class LogcatService {
 
   /// Stop the logcat stream
   Future<void> stopLogcat() async {
+    // Stop package service refresh
+    _packageService.stopRefresh();
+    
     // Close stream first to prevent new events
     if (_logStreamController != null && !_logStreamController!.isClosed) {
       await _logStreamController!.close();

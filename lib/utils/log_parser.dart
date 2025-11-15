@@ -8,7 +8,11 @@ class LogParser {
     r'^(\d{2}-\d{2})\s+(\d{2}:\d{2}:\d{2}\.\d{3})\s+(\d+)\s+(\d+)\s+([VDIWEF])\s+(.+?):\s+(.*)$',
   );
 
-  static LogEntry? parseLine(String line, {int? currentYear, LogEntry? lastEntry}) {
+  static LogEntry? parseLine(
+    String line, {
+    int? currentYear,
+    LogEntry? lastEntry,
+  }) {
     if (line.trim().isEmpty) return null;
 
     final match = _logPattern.firstMatch(line);
@@ -72,4 +76,3 @@ class LogParser {
     }
   }
 }
-

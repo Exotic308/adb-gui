@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../models/device.dart';
 import '../models/log_entry.dart';
 import '../services/logs_service.dart';
+import '../services/service_locator.dart';
 import '../utils/constants.dart';
 import '../widgets/error_display.dart';
 import '../widgets/loading_indicator.dart';
@@ -106,10 +107,7 @@ class _LogsScreenState extends State<LogsScreen> {
     }
 
     if (service.error != null) {
-      return ErrorDisplay(
-        error: service.error!,
-        onRetry: () => service.startStreaming(widget.device.id),
-      );
+      return ErrorDisplay(error: service.error!, onRetry: () => service.startStreaming(widget.device.id));
     }
 
     final filteredEntries = _filterLogs(service.entries);
@@ -226,23 +224,21 @@ class _LogsScreenState extends State<LogsScreen> {
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                SizedBox(width: 70, child: Text(entry.timeString, style: Theme.of(context).textTheme.bodySmall)),
-                SizedBox(
-                  width: 40,
-                  child: Text(
-                    entry.priority.letter,
-                    style: TextStyle(
-                      fontWeight: AppConstants.getPriorityFontWeight(entry.priority),
-                      color: AppConstants.getPriorityColor(entry.priority, isDark),
-                    ),
-                  ),
-                ),
+                SizedBox(width: 100, child: Text(entry.timeString, style: Theme.of(context).textTheme.bodySmall)),
                 Expanded(
-                  child: Text(
-                    '${entry.tag}: ${entry.message}',
-                    style: Theme.of(
-                      context,
-                    ).textTheme.bodySmall?.copyWith(color: AppConstants.getPriorityColor(entry.priority, isDark)),
+                  child: Builder(
+                    builder: (context) {
+                      final packageName = Services.packageService.getPackageName(entry.pid);
+                      final displayText = packageName.isNotEmpty
+                          ? '$packageName/${entry.tag}: ${entry.message}'
+                          : '${entry.tag}: ${entry.message}';
+                      return Text(
+                        displayText,
+                        style: Theme.of(
+                          context,
+                        ).textTheme.bodySmall?.copyWith(color: AppConstants.getPriorityColor(entry.priority, isDark)),
+                      );
+                    },
                   ),
                 ),
               ],
@@ -254,6 +250,8 @@ class _LogsScreenState extends State<LogsScreen> {
   }
 
   Widget _buildLogDetailsPanel(BuildContext context, LogEntry entry, bool isDark) {
+    final packageName = Services.packageService.getPackageName(entry.pid);
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -274,6 +272,7 @@ class _LogsScreenState extends State<LogsScreen> {
           ),
           _buildDetailRow(context, 'PID', entry.pid.toString()),
           _buildDetailRow(context, 'TID', entry.tid.toString()),
+          _buildDetailRow(context, 'Package', packageName),
           _buildDetailRow(context, 'Tag', entry.tag),
           const SizedBox(height: 8),
           Expanded(child: SingleChildScrollView(child: Text(entry.message))),
