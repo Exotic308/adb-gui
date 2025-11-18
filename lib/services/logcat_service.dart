@@ -5,12 +5,10 @@ import 'dart:io';
 import '../models/log_entry.dart';
 import '../utils/log_parser.dart';
 import 'adb_service.dart';
-import 'rules_service.dart';
 import 'package_service.dart';
 
 class LogcatService {
   final AdbService _adbService;
-  final RulesService _rulesService;
   final PackageService _packageService;
   Process? _logcatProcess;
   StreamController<LogEntry>? _logStreamController;
@@ -18,7 +16,7 @@ class LogcatService {
   
   bool get isRunning => _logcatProcess != null;
 
-  LogcatService(this._adbService, this._rulesService, this._packageService);
+  LogcatService(this._adbService, this._packageService);
 
   /// Start streaming logcat from a device
   Future<Stream<LogEntry>> startLogcat(String deviceId, {int? processId}) async {
@@ -34,7 +32,7 @@ class LogcatService {
     // Build ADB command arguments
     final args = <String>['-s', deviceId, 'logcat', '-v', 'threadtime'];
     
-    // Capture all priorities (rules will filter)
+    // Capture all priorities (filtering happens in UI)
     args.add('*:V');
     
     // Add process ID filter if specified (requires Android 7.0+)
@@ -87,12 +85,9 @@ class LogcatService {
     if (entry != null) {
       _lastEntry = entry;
       
-      // Apply rules filtering - only add entry if it matches at least one rule
-      if (_rulesService.shouldRecord(entry.tag, entry.priority)) {
-        // Only add if stream is still open
-        if (!_logStreamController!.isClosed) {
-          _logStreamController!.add(entry);
-        }
+      // Add all entries (filtering happens in UI via query rules)
+      if (!_logStreamController!.isClosed) {
+        _logStreamController!.add(entry);
       }
     }
   }

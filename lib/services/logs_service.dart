@@ -4,12 +4,14 @@ import 'package:flutter/foundation.dart';
 
 import '../models/log_entry.dart';
 import '../services/logcat_service.dart';
+import '../services/rules_service.dart';
 import '../services/settings_service.dart';
 import '../utils/constants.dart';
 
 class LogsService extends ChangeNotifier {
   final LogcatService _logcatService;
   final SettingsService _settingsService;
+  final RulesService _rulesService;
 
   final List<LogEntry> _entries = [];
   final List<LogEntry> _pendingEntries = [];
@@ -24,13 +26,31 @@ class LogsService extends ChangeNotifier {
   bool _isDisposed = false;
   bool _hasTransitionedToStreaming = false;
 
-  LogsService(this._logcatService, this._settingsService);
+  LogsService(this._logcatService, this._settingsService, this._rulesService) {
+    // Listen to rules service changes to refresh filtered entries
+    _rulesService.addListener(_onRulesChanged);
+  }
 
   List<LogEntry> get entries => _entries;
   bool get isLoading => _isLoading;
   bool get isStreaming => _isStreaming;
   String? get error => _error;
   int get totalCount => _entries.length;
+
+  /// Returns filtered entries based on selected query
+  List<LogEntry> getFilteredEntries() {
+    final selectedQueryId = _rulesService.selectedQueryId;
+    if (selectedQueryId == null) {
+      return _entries; // Show all if no query selected
+    }
+    return _entries.where((entry) => _rulesService.evaluateQuery(entry, selectedQueryId)).toList();
+  }
+
+  void _onRulesChanged() {
+    if (!_isDisposed) {
+      notifyListeners(); // Refresh UI when query selection changes
+    }
+  }
 
   Future<void> startStreaming(String deviceId) async {
     _currentDeviceId = deviceId;
@@ -151,6 +171,7 @@ class LogsService extends ChangeNotifier {
   @override
   void dispose() {
     _isDisposed = true;
+    _rulesService.removeListener(_onRulesChanged);
     _batchTimer?.cancel();
     _logSubscription?.cancel();
     _logcatService.stopLogcat();

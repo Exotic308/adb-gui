@@ -48,7 +48,7 @@ class AndroidLogcatApp extends StatelessWidget {
       providers: [
         ChangeNotifierProvider.value(value: Services.settingsService),
         ChangeNotifierProvider(create: (_) => DoctorService(Services.adbService)),
-        ChangeNotifierProvider(create: (_) => LogsService(Services.logcatService, Services.settingsService)),
+        ChangeNotifierProvider(create: (_) => LogsService(Services.logcatService, Services.settingsService, Services.rulesService)),
         ChangeNotifierProvider.value(value: Services.rulesService),
       ],
       child: Consumer<SettingsService>(

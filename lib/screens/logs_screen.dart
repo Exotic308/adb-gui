@@ -3,12 +3,13 @@ import 'package:provider/provider.dart';
 
 import '../models/device.dart';
 import '../models/log_entry.dart';
+import '../models/named_query.dart';
 import '../services/logs_service.dart';
+import '../services/rules_service.dart';
 import '../services/service_locator.dart';
 import '../utils/constants.dart';
 import '../widgets/error_display.dart';
 import '../widgets/loading_indicator.dart';
-import '../widgets/logs_app_bar.dart';
 import 'rules_screen.dart';
 
 class LogsScreen extends StatefulWidget {
@@ -91,12 +92,7 @@ class _LogsScreenState extends State<LogsScreen> {
 
     return Consumer<LogsService>(
       builder: (context, service, _) {
-        return Column(
-          children: [
-            LogsAppBar(device: widget.device, isDeviceConnected: widget.isDeviceConnected, service: service),
-            Expanded(child: _buildContent(context, service, isDark)),
-          ],
-        );
+        return _buildContent(context, service, isDark);
       },
     );
   }
@@ -110,7 +106,7 @@ class _LogsScreenState extends State<LogsScreen> {
       return ErrorDisplay(error: service.error!, onRetry: () => service.startStreaming(widget.device.id));
     }
 
-    final filteredEntries = _filterLogs(service.entries);
+    final filteredEntries = _filterLogs(service.getFilteredEntries());
 
     if (service.isStreaming && _autoScroll) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -193,6 +189,57 @@ class _LogsScreenState extends State<LogsScreen> {
               ),
               onChanged: (_) => setState(() {}),
             ),
+          ),
+          const SizedBox(width: 8),
+          Consumer<RulesService>(
+            builder: (context, rulesService, _) {
+              // Validate selectedQueryId exists in queries list
+              final selectedId = rulesService.selectedQueryId;
+              final validSelectedId = selectedId != null &&
+                      rulesService.queries.any((q) => q.id == selectedId)
+                  ? selectedId
+                  : null;
+              
+              // Ensure no duplicate IDs
+              final uniqueQueries = <String, NamedQuery>{};
+              for (final query in rulesService.queries) {
+                if (!uniqueQueries.containsKey(query.id)) {
+                  uniqueQueries[query.id] = query;
+                }
+              }
+              
+              // If selectedId was invalid, clear it
+              if (selectedId != null && validSelectedId == null) {
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  rulesService.setSelectedQuery(null);
+                });
+              }
+              
+              return DropdownButton<String?>(
+                value: validSelectedId,
+                hint: const Text('<all>'),
+                isDense: true,
+                items: [
+                  const DropdownMenuItem<String?>(
+                    value: null,
+                    child: Text('<all>'),
+                  ),
+                  ...uniqueQueries.values.map((query) => DropdownMenuItem<String?>(
+                        value: query.id,
+                        child: Text(query.name),
+                      )),
+                ],
+                onChanged: (queryId) {
+                  rulesService.setSelectedQuery(queryId);
+                },
+              );
+            },
+          ),
+          const SizedBox(width: 8),
+          IconButton(
+            icon: const Icon(Icons.delete_sweep),
+            onPressed: widget.isDeviceConnected ? () => context.read<LogsService>().clearLogs() : null,
+            tooltip: widget.isDeviceConnected ? 'Clear Logs' : 'Device disconnected',
           ),
           const SizedBox(width: 16),
           Text('$displayedCount / $totalCount'),
